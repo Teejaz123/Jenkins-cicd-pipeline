@@ -8,21 +8,27 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Install dependencies') {
             steps {
-                sh 'docker build -t jenkins-cicd-app ./docker'
+                sh 'pip install -r requirements.txt'
             }
         }
 
-        stage('Test') {
+        stage('Run Tests') {
             steps {
-                sh 'pytest app/tests/'
+                sh 'pytest --maxfail=1 --disable-warnings -q'
             }
         }
 
-        stage('Run') {
+        stage('Build Docker Image') {
             steps {
-                sh 'docker run -d -p 5000:5000 --name cicd-app jenkins-cicd-app'
+                sh 'docker build -t jenkins-cicd-app -f docker/Dockerfile .'
+            }
+        }
+
+        stage('Run Docker Container') {
+            steps {
+                sh 'docker run -d -p 5000:5000 --name jenkins-cicd-app jenkins-cicd-app'
             }
         }
     }
@@ -30,6 +36,9 @@ pipeline {
     post {
         always {
             sh 'docker ps -a'
+        }
+        failure {
+            echo 'Build or tests failed!'
         }
     }
 }

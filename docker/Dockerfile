@@ -1,8 +1,20 @@
-FROM python:3.10-slim
+# docker/Dockerfile
+FROM python:3.13-slim
 
+# Set working directory
 WORKDIR /app
-COPY app/ /app/
 
-RUN pip install -r requirements.txt
+# Copy dependencies
+COPY requirements.txt .
 
-CMD ["python", "app.py"]
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Expose port
+EXPOSE 5000
+
+# Run the app
+CMD ["python", "run.py"]
