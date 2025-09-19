@@ -10,14 +10,22 @@ pipeline {
 
         stage('Install dependencies') {
             steps {
-                sh 'pip install -r requirements.txt'
-            }
+                sh '''
+                    python3 -m venv venv        # create virtual environment
+                    . venv/bin/activate         # activate it
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
+                '''
+	    }
         }
 
         stage('Run Tests') {
             steps {
-                sh 'pytest --maxfail=1 --disable-warnings -q'
-            }
+                sh '''
+                    . venv/bin/activate
+                    PYTHONPATH=. pytest --maxfail=1 --disable-warnings -q
+                '''
+            }            
         }
 
         stage('Build Docker Image') {
