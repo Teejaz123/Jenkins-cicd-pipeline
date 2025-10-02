@@ -49,20 +49,24 @@ pipeline {
         }
 
         stage('Deploy Container') {
-            steps {
-                sh """
-                    # Stop & remove old container if exists
-                    docker stop $CONTAINER_NAME || true
-                    docker rm $CONTAINER_NAME || true
+    steps {
+        sh """
+            # Stop and remove old container if it exists
+            if [ "\$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
+                docker stop $CONTAINER_NAME
+            fi
+            if [ "\$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
+                docker rm $CONTAINER_NAME
+            fi
 
+            # Kill any process still holding port 5000 (safety net)
+            fuser -k 5000/tcp || true
 
-                    # Run new container
-                    docker run -d --name $CONTAINER_NAME -p 5000:5000 $IMAGE_NAME
-                """
-            }
-        }
+            # Run new container on port 5000
+            docker run -d --name $CONTAINER_NAME -p 5000:5000 $IMAGE_NAME
+        """
     }
-
+}
     post {
         always {
             // Cleanup unused Docker images
