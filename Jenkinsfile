@@ -2,12 +2,11 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME       = "jenkins-cicd-app"
-        BUILD_NUMBER_INT = env.BUILD_NUMBER.toInteger()  // convert string to integer
-        IMAGE_NAME     = "${APP_NAME}:${BUILD_NUMBER}"
-        CONTAINER_NAME = "${APP_NAME}-${BUILD_NUMBER}"
-        TEST_CONTAINER = "temp-${APP_NAME}-${BUILD_NUMBER}"
-        TEST_PORT      = "${5000 + BUILD_NUMBER_INT}"
+        APP_NAME        = "jenkins-cicd-app"
+        IMAGE_NAME      = "${APP_NAME}:${BUILD_NUMBER}"
+        CONTAINER_NAME  = "${APP_NAME}"
+        TEST_CONTAINER  = "temp-${APP_NAME}-${BUILD_NUMBER}"
+        TEST_PORT       = 5050   // dedicated temp test port
     }
 
     stages {
@@ -37,13 +36,14 @@ pipeline {
             }
         }
 
-        stage('Test Inside Container') {
+        stage('Smoke Test (Temp Container)') {
             steps {
                 sh """
-                    # Run a temporary container for smoke test
+                    echo "Running smoke test on port $TEST_PORT..."
                     docker run --rm -d --name $TEST_CONTAINER -p $TEST_PORT:5000 $IMAGE_NAME
                     sleep 5
                     curl -f http://localhost:$TEST_PORT || (echo "Smoke test failed!" && exit 1)
+                    docker stop $TEST_CONTAINER || true
                 """
             }
         }
@@ -51,7 +51,9 @@ pipeline {
         stage('Deploy Container') {
             steps {
                 sh """
-                    # Stop and remove old container if it exists
+                    echo "Deploying $IMAGE_NAME as $CONTAINER_NAME..."
+
+                    # Stop and remove existing container if present
                     if [ "\$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
                         docker stop $CONTAINER_NAME
                     fi
@@ -59,27 +61,27 @@ pipeline {
                         docker rm $CONTAINER_NAME
                     fi
 
-                    # Kill any process still holding port 5000 (safety net)
+                    # Ensure port 5000 is free
                     fuser -k 5000/tcp || true
 
-                    # Run new container on port 5000
+                    # Run the latest image
                     docker run -d --name $CONTAINER_NAME -p 5000:5000 $IMAGE_NAME
                 """
             }
         }
-    }   
+    }
+
     post {
         always {
-            // Cleanup unused Docker images
+            echo " Cleaning up unused images..."
             sh 'docker image prune -f'
-            // Optional: archive logs if needed
             archiveArtifacts artifacts: '**/*.log', allowEmptyArchive: true
         }
         success {
-            echo "✅ Pipeline complete: New version deployed!"
+            echo "✅ Pipeline complete: ${APP_NAME} successfully deployed on port 5000!"
         }
         failure {
-            echo "❌ Build or tests failed!"
+            echo "❌ Pipeline failed. Check console for details."
         }
     }
 }
