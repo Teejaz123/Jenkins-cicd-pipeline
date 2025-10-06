@@ -48,6 +48,7 @@ pipeline {
                     """
                 }
             }
+        }
 
         stage('Smoke Test (Temp Container)') {
             steps {
