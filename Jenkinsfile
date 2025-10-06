@@ -28,13 +28,26 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build & Push Docker Image') {
             steps {
-                sh """
-                    docker build -t $IMAGE_NAME -f docker/Dockerfile .
-                """
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh """
+                        echo " Building Docker image..."
+                        docker build -t $IMAGE_NAME -f docker/Dockerfile .
+        
+                        echo " Logging in to Docker Hub..."
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+        
+                        echo " Tagging image for Docker Hub..."
+                        docker tag $IMAGE_NAME $DOCKER_USER/$APP_NAME:$BUILD_NUMBER
+                        docker tag $IMAGE_NAME $DOCKER_USER/$APP_NAME:latest
+        
+                        echo "Pushing to Docker Hub..."
+                        docker push $DOCKER_USER/$APP_NAME:$BUILD_NUMBER
+                        docker push $DOCKER_USER/$APP_NAME:latest
+                    """
+                }
             }
-        }
 
         stage('Smoke Test (Temp Container)') {
             steps {
